@@ -541,7 +541,9 @@ public class CollationSupportSuite {
         UTF8String.fromString(sourceString), collationId).toString();
     } else {
       result = CollationSupport.StringTrim.exec(
-        UTF8String.fromString(sourceString), UTF8String.fromString(trimString), collationId).toString();
+        UTF8String
+          .fromString(sourceString), UTF8String.fromString(trimString), collationId)
+          .toString();
     }
 
     assertEquals(expectedResultString, result);
@@ -560,7 +562,9 @@ public class CollationSupportSuite {
         UTF8String.fromString(sourceString), collationId).toString();
     } else {
       result = CollationSupport.StringTrimLeft.exec(
-        UTF8String.fromString(sourceString), UTF8String.fromString(trimString), collationId).toString();
+        UTF8String
+          .fromString(sourceString), UTF8String.fromString(trimString), collationId)
+          .toString();
     }
 
     assertEquals(expectedResultString, result);
@@ -579,7 +583,9 @@ public class CollationSupportSuite {
         UTF8String.fromString(sourceString), collationId).toString();
     } else {
       result = CollationSupport.StringTrimRight.exec(
-        UTF8String.fromString(sourceString), UTF8String.fromString(trimString), collationId).toString();
+        UTF8String
+          .fromString(sourceString), UTF8String.fromString(trimString), collationId)
+          .toString();
     }
 
     assertEquals(expectedResultString, result);
