@@ -161,14 +161,20 @@ class AstBuilder extends DataTypeAstBuilder with SQLConfHelper with Logging {
       case logicalPlan: LogicalPlan =>
         SparkStatementWithPlan(
           parsedPlan = logicalPlan,
-          sourceStart = ctx.statement().start.getStartIndex,
-          sourceEnd = ctx.statement().stop.getStopIndex + 1)
+          sourceStart = if (ctx.statement() != null) ctx.statement().start.getStartIndex
+            else ctx.compoundSetStatement().start.getStartIndex,
+          sourceEnd = if (ctx.statement() != null) ctx.statement().stop.getStopIndex + 1
+            else ctx.compoundSetStatement().stop.getStopIndex + 1)
       case statement: CompoundPlanStatement => statement
     }
   }
 
   override def visitSingleStatement(ctx: SingleStatementContext): LogicalPlan = withOrigin(ctx) {
-    visit(ctx.statement).asInstanceOf[LogicalPlan]
+    if (ctx.statement != null) {
+      visit(ctx.statement).asInstanceOf[LogicalPlan]
+    } else {
+      visit(ctx.setStatement).asInstanceOf[LogicalPlan]
+    }
   }
 
   override def visitSingleExpression(ctx: SingleExpressionContext): Expression = withOrigin(ctx) {
@@ -5385,26 +5391,20 @@ class AstBuilder extends DataTypeAstBuilder with SQLConfHelper with Logging {
     )
   }
 
-  /**
-   * Create a [[SetVariable]] command.
-   *
-   * For example:
-   * {{{
-   *   SET VARIABLE var1 = v1, var2 = v2, ...
-   *   SET VARIABLE (var1, var2, ...) = (SELECT ...)
-   * }}}
-   */
-  override def visitSetVariable(ctx: SetVariableContext): LogicalPlan = withOrigin(ctx) {
-    if (ctx.query() != null) {
+  private def visitSetVariableImpl(
+      query: QueryContext,
+      multipartIdentifierList: MultipartIdentifierListContext,
+      assignmentList: AssignmentListContext): LogicalPlan = {
+    if (query != null) {
       // The SET variable source is a query
-      val variables = ctx.multipartIdentifierList.multipartIdentifier.asScala.map { variableIdent =>
+      val variables = multipartIdentifierList.multipartIdentifier.asScala.map { variableIdent =>
         val varName = visitMultipartIdentifier(variableIdent)
         UnresolvedAttribute(varName)
       }.toSeq
-      SetVariable(variables, visitQuery(ctx.query()))
+      SetVariable(variables, visitQuery(query))
     } else {
       // The SET variable source is list of expressions.
-      val (variables, values) = ctx.assignmentList().assignment().asScala.map { assign =>
+      val (variables, values) = assignmentList.assignment().asScala.map { assign =>
         val varIdent = visitMultipartIdentifier(assign.key)
         val varExpr = expression(assign.value)
         val varNamedExpr = varExpr match {
@@ -5415,5 +5415,22 @@ class AstBuilder extends DataTypeAstBuilder with SQLConfHelper with Logging {
       }.toSeq.unzip
       SetVariable(variables, Project(values, OneRowRelation()))
     }
+  }
+
+  /**
+   * Create a [[SetVariable]] command.
+   *
+   * For example:
+   * {{{
+   *   SET VARIABLE var1 = v1, var2 = v2, ...
+   *   SET VARIABLE (var1, var2, ...) = (SELECT ...)
+   * }}}
+   */
+  override def visitSetVariable(ctx: SetVariableContext): LogicalPlan = withOrigin(ctx) {
+    visitSetVariableImpl(ctx.query(), ctx.multipartIdentifierList(), ctx.assignmentList())
+  }
+
+  override def visitCompoundSetVariable(ctx: CompoundSetVariableContext): LogicalPlan = {
+    visitSetVariableImpl(ctx.query(), ctx.multipartIdentifierList(), ctx.assignmentList())
   }
 }

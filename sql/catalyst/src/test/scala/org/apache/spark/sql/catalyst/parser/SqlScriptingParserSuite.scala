@@ -144,6 +144,33 @@ class SqlScriptingParserSuite extends SparkFunSuite with SQLHelper {
       nestedBody.collection(1).asInstanceOf[SparkStatementWithPlan].getText(batch) == "SELECT 3")
   }
 
+  test("SET statement test") {
+    val batch =
+      """
+        |BEGIN
+        |  DECLARE totalInsCnt = 0;
+        |  SET totalInsCnt = (SELECT x FROM y WHERE id = 1);
+        |END""".stripMargin
+    val tree = parseScript(batch)
+    assert(tree.collection.length == 2)
+    assert(tree.collection.head.isInstanceOf[SparkStatementWithPlan])
+    assert(tree.collection(1).isInstanceOf[SparkStatementWithPlan])
+  }
+
+  test("SET statement test - should fail") {
+    val batch =
+      """
+        |BEGIN
+        |  DECLARE totalInsCnt = 0;
+        |  SET totalInsCnt = (SELECT x FROMERROR y WHERE id = 1);
+        |END""".stripMargin
+    val e = intercept[ParseException] {
+      parseScript(batch)
+    }
+    assert(e.getErrorClass === "PARSE_SYNTAX_ERROR")
+    assert(e.getMessage.contains("Syntax error"))
+  }
+
   // Helper methods
   def cleanupStatementString(statementStr: String): String = {
     statementStr

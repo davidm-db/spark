@@ -62,11 +62,18 @@ compoundBody
 
 compoundStatement
     : statement
+    | compoundSetStatement
     | compound
     ;
 
+compoundSetStatement
+    : SET (VARIABLE | VAR)? assignmentList                 #compoundSetVariable
+    | SET (VARIABLE | VAR)? LEFT_PAREN multipartIdentifierList RIGHT_PAREN EQ
+        LEFT_PAREN query RIGHT_PAREN                       #compoundSetVariable
+    ;
+
 singleStatement
-    : statement SEMICOLON* EOF
+    : (statement|setStatement) SEMICOLON* EOF
     ;
 
 singleExpression
@@ -196,7 +203,7 @@ statement
         identifierReference dataType? variableDefaultExpression?       #createVariable
     | DROP TEMPORARY VARIABLE (IF EXISTS)? identifierReference         #dropVariable
     | EXPLAIN (LOGICAL | FORMATTED | EXTENDED | CODEGEN | COST)?
-        statement                                                      #explain
+        (statement|setStatement)                                       #explain
     | SHOW TABLES ((FROM | IN) identifierReference)?
         (LIKE? pattern=stringLit)?                                        #showTables
     | SHOW TABLE EXTENDED ((FROM | IN) ns=identifierReference)?
@@ -235,18 +242,6 @@ statement
     | (MSCK)? REPAIR TABLE identifierReference
         (option=(ADD|DROP|SYNC) PARTITIONS)?                           #repairTable
     | op=(ADD | LIST) identifier .*?                                   #manageResource
-    | SET COLLATION collationName=identifier                           #setCollation
-    | SET ROLE .*?                                                     #failNativeCommand
-    | SET TIME ZONE interval                                           #setTimeZone
-    | SET TIME ZONE timezone                                           #setTimeZone
-    | SET TIME ZONE .*?                                                #setTimeZone
-    | SET (VARIABLE | VAR) assignmentList                              #setVariable
-    | SET (VARIABLE | VAR) LEFT_PAREN multipartIdentifierList RIGHT_PAREN EQ
-          LEFT_PAREN query RIGHT_PAREN                                 #setVariable
-    | SET configKey EQ configValue                                     #setQuotedConfiguration
-    | SET configKey (EQ .*?)?                                          #setConfiguration
-    | SET .*? EQ configValue                                           #setQuotedConfiguration
-    | SET .*?                                                          #setConfiguration
     | RESET configKey                                                  #resetQuotedConfiguration
     | RESET .*?                                                        #resetConfiguration
     | CREATE INDEX (IF errorCapturingNot EXISTS)? identifier ON TABLE?
@@ -255,6 +250,21 @@ statement
         (OPTIONS options=propertyList)?                                #createIndex
     | DROP INDEX (IF EXISTS)? identifier ON TABLE? identifierReference #dropIndex
     | unsupportedHiveNativeCommands .*?                                #failNativeCommand
+    ;
+
+setStatement
+    : SET COLLATION collationName=identifier                           #setCollation
+    | SET ROLE .*?                                                     #failSetRole
+    | SET TIME ZONE interval                                           #setTimeZone
+    | SET TIME ZONE timezone                                           #setTimeZone
+    | SET TIME ZONE .*?                                                #setTimeZone
+    | SET (VARIABLE | VAR) assignmentList                              #setVariable
+    | SET (VARIABLE | VAR) LEFT_PAREN multipartIdentifierList RIGHT_PAREN EQ
+            LEFT_PAREN query RIGHT_PAREN                               #setVariable
+    | SET configKey EQ configValue                                     #setQuotedConfiguration
+    | SET configKey (EQ .*?)?                                          #setConfiguration
+    | SET .*? EQ configValue                                           #setQuotedConfiguration
+    | SET .*?                                                          #setConfiguration
     ;
 
 executeImmediate
